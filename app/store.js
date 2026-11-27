@@ -1,163 +1,154 @@
-// Dompet Keluarga — penyimpanan dan hitungan. Satu sumber kebenaran untuk
-// semua halaman: tambah, ubah, dan hapus di sini, lalu semua total, grafik,
-// dan kartu ikut berubah. Data tersimpan di peramban (localStorage) dan bisa
-// dikembalikan ke data contoh kapan pun.
+// State dan perhitungan Dompet Keluarga.
+// Semua total dihitung live dari daftar transaksi, bukan angka tempel.
+// Perubahan disimpan di localStorage (kunci dompet-keluarga-v1); kalau
+// penyimpanan tidak tersedia, state tetap hidup selama halaman dibuka.
 
-import { SEED_TRANSACTIONS, SEED_BUDGETS, SEED_GOALS, SEED_BILLS, TODAY } from './data.js';
+import { CATEGORIES, MONTH_LABELS, freshSeed } from "./data.js";
 
-const STORAGE_KEY = 'dompet-keluarga-v1';
+const KEY = "dompet-keluarga-v1";
+let state = freshSeed();
+let memoryOnly = false;
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function seedState() {
-  return {
-    transactions: clone(SEED_TRANSACTIONS),
-    budgets: { ...SEED_BUDGETS },
-    goals: clone(SEED_GOALS),
-    bills: clone(SEED_BILLS),
-  };
-}
-
-function loadState() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedState();
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) {
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.transactions)) return seedState();
-    return {
-      transactions: parsed.transactions,
-      budgets: { ...SEED_BUDGETS, ...(parsed.budgets || {}) },
-      goals: Array.isArray(parsed.goals) ? parsed.goals : clone(SEED_GOALS),
-      bills: Array.isArray(parsed.bills) ? parsed.bills : clone(SEED_BILLS),
-    };
-  } catch {
-    return seedState();
+    if (parsed && Array.isArray(parsed.expenses) && Array.isArray(parsed.income)) {
+      state = parsed;
+    }
+  }
+} catch (e) {
+  memoryOnly = true;
+}
+
+export function getState() {
+  return state;
+}
+
+export function saveState() {
+  if (memoryOnly) return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  } catch (e) {
+    memoryOnly = true;
   }
 }
 
-export const store = {
-  state: loadState(),
+export function resetSeed() {
+  state = freshSeed();
+  saveState();
+}
 
-  save() {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch {
-      // Penyimpanan penuh atau dimatikan: aplikasi tetap jalan di memori.
-    }
-  },
+export function totalIncome() {
+  return state.income.reduce((s, x) => s + x.amount, 0);
+}
 
-  reset() {
-    this.state = seedState();
-    this.save();
-  },
+export function totalExpense() {
+  return state.expenses.reduce((s, x) => s + x.amount, 0);
+}
 
-  totals() {
-    let income = 0;
-    let expense = 0;
-    for (const t of this.state.transactions) {
-      if (t.kind === 'income') income += t.amount;
-      else expense += t.amount;
-    }
-    return { income, expense, balance: income - expense };
-  },
+export function remaining() {
+  return totalIncome() - totalExpense();
+}
 
-  byCategory() {
-    const map = {};
-    for (const t of this.state.transactions) {
-      if (t.kind !== 'expense') continue;
-      map[t.category] = (map[t.category] || 0) + t.amount;
-    }
-    return map;
-  },
+export function spendByCategory() {
+  const out = {};
+  for (const c of CATEGORIES) out[c.id] = 0;
+  for (const t of state.expenses) {
+    if (out[t.category] === undefined) out[t.category] = 0;
+    out[t.category] += t.amount;
+  }
+  return out;
+}
 
-  budgetTotal() {
-    return Object.values(this.state.budgets).reduce((a, b) => a + b, 0);
-  },
+export function totalBudget() {
+  return Object.values(state.budgets).reduce((s, v) => s + v, 0);
+}
 
-  goalsTotal() {
-    let saved = 0;
-    let target = 0;
-    for (const g of this.state.goals) {
-      saved += g.saved;
-      target += g.target;
-    }
-    return { saved, target };
-  },
+export function tightestBudgets() {
+  const spent = spendByCategory();
+  return CATEGORIES.map((c) => ({
+    ...c,
+    spent: spent[c.id] || 0,
+    limit: state.budgets[c.id] || 0,
+    ratio: (spent[c.id] || 0) / (state.budgets[c.id] || 1),
+  })).sort((a, b) => b.ratio - a.ratio);
+}
 
-  upcomingBills() {
-    return this.state.bills
-      .filter((b) => !b.paid)
-      .sort((a, b) => (a.due < b.due ? -1 : 1));
-  },
+export function unpaidBills() {
+  return state.bills.filter((b) => !b.paid);
+}
 
-  unpaidTotal() {
-    return this.upcomingBills().reduce((sum, b) => sum + b.amount, 0);
-  },
+export function unpaidTotal() {
+  return unpaidBills().reduce((s, b) => s + b.amount, 0);
+}
 
-  daysUntil(iso) {
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const today = new Date(TODAY + 'T00:00:00');
-    const due = new Date(iso + 'T00:00:00');
-    return Math.round((due - today) / msPerDay);
-  },
+export function savingsTotals() {
+  const saved = state.savings.reduce((s, g) => s + g.saved, 0);
+  const target = state.savings.reduce((s, g) => s + g.target, 0);
+  return { saved, target };
+}
 
-  addTransaction(entry) {
-    const id = 't' + Date.now().toString(36);
-    this.state.transactions.push({ id, ...entry });
-    this.state.transactions.sort((a, b) => (a.date < b.date ? 1 : -1));
-    this.save();
-    return id;
-  },
+export function monthSummary(monthKey) {
+  if (monthKey === state.month) {
+    return { label: MONTH_LABELS[monthKey] || monthKey, income: totalIncome(), expense: totalExpense() };
+  }
+  const row = state.history.find((h) => h.month === monthKey);
+  if (row) return { label: MONTH_LABELS[monthKey] || monthKey, income: row.income, expense: row.expense };
+  return { label: MONTH_LABELS[monthKey] || monthKey, income: 0, expense: 0 };
+}
 
-  updateTransaction(id, entry) {
-    const item = this.state.transactions.find((t) => t.id === id);
-    if (!item) return false;
-    Object.assign(item, entry);
-    this.state.transactions.sort((a, b) => (a.date < b.date ? 1 : -1));
-    this.save();
-    return true;
-  },
+export function monthOptions() {
+  return [...state.history.map((h) => h.month), state.month];
+}
 
-  deleteTransaction(id) {
-    this.state.transactions = this.state.transactions.filter((t) => t.id !== id);
-    this.save();
-  },
+let counter = 100;
+export function nextId(prefix) {
+  counter += 1;
+  return prefix + Date.now().toString(36) + counter;
+}
 
-  setBudget(category, amount) {
-    this.state.budgets[category] = Math.max(0, Math.round(amount) || 0);
-    this.save();
-  },
+export function addExpense(tx) {
+  state.expenses.push({ id: nextId("e"), ...tx });
+  state.expenses.sort((a, b) => (a.date < b.date ? -1 : 1));
+  saveState();
+}
 
-  addToGoal(id, amount) {
-    const goal = this.state.goals.find((g) => g.id === id);
-    if (!goal) return false;
-    goal.saved = Math.min(goal.target, goal.saved + Math.max(0, Math.round(amount) || 0));
-    this.save();
-    return true;
-  },
+export function updateExpense(id, patch) {
+  const t = state.expenses.find((x) => x.id === id);
+  if (t) Object.assign(t, patch);
+  saveState();
+}
 
-  addGoal(entry) {
-    const id = 'g' + Date.now().toString(36);
-    this.state.goals.push({ id, ...entry });
-    this.save();
-    return id;
-  },
+export function deleteExpense(id) {
+  state.expenses = state.expenses.filter((x) => x.id !== id);
+  saveState();
+}
 
-  toggleBill(id) {
-    const bill = this.state.bills.find((b) => b.id === id);
-    if (!bill) return false;
-    bill.paid = !bill.paid;
-    this.save();
-    return true;
-  },
+export function setBudget(categoryId, amount) {
+  state.budgets[categoryId] = Math.max(0, Math.round(amount) || 0);
+  saveState();
+}
 
-  addBill(entry) {
-    const id = 'b' + Date.now().toString(36);
-    this.state.bills.push({ id, paid: false, ...entry });
-    this.state.bills.sort((a, b) => (a.due < b.due ? -1 : 1));
-    this.save();
-    return id;
-  },
-};
+export function addSavings(goalId, amount) {
+  const g = state.savings.find((x) => x.id === goalId);
+  if (g) g.saved = Math.min(g.target, g.saved + Math.max(0, Math.round(amount) || 0));
+  saveState();
+}
+
+export function addGoal(goal) {
+  state.savings.push({ id: nextId("s"), saved: 0, ...goal });
+  saveState();
+}
+
+export function markBillPaid(id) {
+  const b = state.bills.find((x) => x.id === id);
+  if (b) b.paid = true;
+  saveState();
+}
+
+export function addBill(bill) {
+  state.bills.push({ id: nextId("b"), paid: false, ...bill });
+  state.bills.sort((a, b) => (a.due < b.due ? -1 : 1));
+  saveState();
+}

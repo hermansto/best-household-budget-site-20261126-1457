@@ -1,42 +1,55 @@
-// Dompet Keluarga — grafik SVG tanpa pustaka: donat kategori dan batang bulanan.
+// Grafik Dompet Keluarga: donat pengeluaran per kategori (SVG) dan
+// batang pemasukan vs pengeluaran per bulan. Tanpa pustaka luar.
 
-import { rupiahShort } from './format.js';
+import { formatRupiah, formatShort } from "./format.js";
 
-const TAU = Math.PI * 2;
-
-export function donutChart(slices, size) {
-  const radius = 62;
-  const center = size / 2;
-  const circumference = TAU * radius;
-  const total = slices.reduce((sum, s) => sum + s.value, 0);
-  if (!total) {
-    return '<svg viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" role="img" aria-label="Belum ada pengeluaran">'
-      + '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="none" stroke="#e4dccb" stroke-width="26"/></svg>';
-  }
-  let offset = 0.25 * circumference;
-  let circles = '';
-  for (const slice of slices) {
-    const fraction = slice.value / total;
-    const length = Math.max(0, fraction * circumference - 2);
-    circles += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="none" stroke="' + slice.color
-      + '" stroke-width="26" stroke-dasharray="' + length.toFixed(1) + ' ' + circumference.toFixed(1)
-      + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>';
-    offset -= fraction * circumference;
-  }
-  return '<svg viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" role="img" aria-label="Pembagian pengeluaran per kategori">'
-    + circles
-    + '<text x="' + center + '" y="' + (center - 4) + '" text-anchor="middle" font-size="15" font-weight="700" fill="#22302a">Total</text>'
-    + '<text x="' + center + '" y="' + (center + 16) + '" text-anchor="middle" font-size="12" fill="#5b6b62">' + rupiahShort(total) + '</text></svg>';
+export function donutChart(rows, size) {
+  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+  const r = 70;
+  const cx = 90;
+  const cy = 90;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  const rings = rows
+    .filter((x) => x.value > 0)
+    .map((x) => {
+      const frac = x.value / total;
+      const dash = frac * circ;
+      const el =
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' +
+        x.color + '" stroke-width="34" stroke-dasharray="' + dash.toFixed(1) + " " +
+        (circ - dash).toFixed(1) + '" stroke-dashoffset="' + (-offset).toFixed(1) + '"/>';
+      offset += dash;
+      return el;
+    })
+    .join("");
+  const hole =
+    '<circle cx="' + cx + '" cy="' + cy + '" r="52" fill="#fffdf6"/>' +
+    '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="15" font-weight="700" fill="#1d2b23">Total</text>' +
+    '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" font-size="12" fill="#5b6b60">' +
+    formatShort(total) + "</text>";
+  return (
+    '<svg class="donut" viewBox="0 0 180 180" width="' + size + '" height="' + size +
+    '" role="img" aria-label="Donat pengeluaran per kategori, total ' + formatRupiah(total) + '">' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#e9e2d2" stroke-width="34"/>' +
+    rings + hole + "</svg>"
+  );
 }
 
-export function monthBars(months, maxValue) {
-  const max = Math.max(1, maxValue || 0);
-  return months.map((m) => {
-    const inHeight = Math.max(3, Math.round((m.income / max) * 100));
-    const outHeight = Math.max(3, Math.round((m.expense / max) * 100));
-    return '<div class="month-col' + (m.selected ? ' sel' : '') + '">'
-      + '<div class="bars"><i class="in" style="height:' + inHeight + 'px" title="Pemasukan ' + rupiahShort(m.income) + '"></i>'
-      + '<i class="out" style="height:' + outHeight + 'px" title="Pengeluaran ' + rupiahShort(m.expense) + '"></i></div>'
-      + '<span class="m-label">' + m.label + '</span></div>';
-  }).join('');
+export function monthBars(rows) {
+  const max = Math.max(1, ...rows.flatMap((r) => [r.income, r.expense]));
+  return rows
+    .map((r) => {
+      const hi = Math.max(4, Math.round((r.income / max) * 120));
+      const he = Math.max(4, Math.round((r.expense / max) * 120));
+      return (
+        '<div class="bar-group"><div class="bars">' +
+        '<div class="bar in" style="height:' + hi + 'px" title="Pemasukan ' + formatRupiah(r.income) + '"></div>' +
+        '<div class="bar out" style="height:' + he + 'px" title="Pengeluaran ' + formatRupiah(r.expense) + '"></div>' +
+        "</div>" +
+        '<div class="bar-label">' + r.label + "</div>" +
+        '<div class="bar-values">' + formatShort(r.income) + " / " + formatShort(r.expense) + "</div></div>"
+      );
+    })
+    .join("");
 }

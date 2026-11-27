@@ -1,19 +1,41 @@
-// Dompet Keluarga — titik masuk situs: router hash dan render awal.
-// Rute: #/ ringkasan, #/transaksi, #/anggaran, #/tabungan, #/tagihan, #/laporan.
+// Router dan titik masuk Dompet Keluarga.
+// Membaca hash route (#/, #/transaksi, …), merender halaman yang cocok,
+// menandai tautan aktif, dan merender ulang saat state berubah.
 
-import { renderRoute } from './views.js';
+import {
+  viewDashboard, viewTransactions, bindTransactions,
+  viewBudget, bindBudget, viewSavings, bindSavings,
+  viewBills, bindBills, viewReport, bindReport, setRenderer,
+} from "./views.js";
 
-const app = document.getElementById('app');
+const ROUTES = {
+  "/": { render: viewDashboard, bind: null, label: "Ringkasan" },
+  "/transaksi": { render: viewTransactions, bind: bindTransactions, label: "Transaksi" },
+  "/anggaran": { render: viewBudget, bind: bindBudget, label: "Anggaran" },
+  "/tabungan": { render: viewSavings, bind: bindSavings, label: "Tabungan" },
+  "/tagihan": { render: viewBills, bind: bindBills, label: "Tagihan" },
+  "/laporan": { render: viewReport, bind: bindReport, label: "Laporan" },
+};
 
 function currentRoute() {
-  const hash = window.location.hash || '#/';
-  const path = hash.replace(/^#\/?/, '').split('/')[0].split('?')[0];
-  return path;
+  const hash = location.hash.replace(/^#/, "") || "/";
+  return ROUTES[hash] ? hash : "/";
 }
 
-function render() {
-  renderRoute(currentRoute(), app);
+export function render() {
+  const route = currentRoute();
+  const page = ROUTES[route];
+  const root = document.getElementById("view");
+  root.innerHTML = page.render();
+  if (page.bind) page.bind(root);
+  document.querySelectorAll("nav a").forEach((a) => {
+    a.classList.toggle("active", a.getAttribute("href") === "#" + route);
+    if (a.getAttribute("href") === "#" + route) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  window.scrollTo(0, 0);
 }
 
-window.addEventListener('hashchange', render);
+setRenderer(render);
+window.addEventListener("hashchange", render);
 render();

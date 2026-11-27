@@ -3,32 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dompet Keluarga — Atur Uang Rumah Tangga</title>
-<meta name="description" content="Dompet Keluarga membantu keluarga Indonesia mencatat pemasukan dan pengeluaran, menjaga anggaran tiap kategori, menabung untuk target, dan tidak ketinggalan tagihan.">
+<title>Dompet Keluarga — Anggaran Rumah Tangga Budi &amp; Sari</title>
+<meta name="description" content="Dompet Keluarga: ringkasan, transaksi, anggaran, tabungan, tagihan, dan laporan keuangan rumah tangga keluarga Budi & Sari di Jakarta, November 2026.">
 <link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="style.css">
-<script type="module" src="main.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="#/">
-    <span class="brand-mark" aria-hidden="true">Rp</span>
-    <span class="brand-name">Dompet Keluarga</span>
-    <span class="brand-tag">uang rumah tangga, beres</span>
-  </a>
-  <nav class="mainnav" aria-label="Navigasi utama">
-    <a href="#/" data-route="">Ringkasan</a>
-    <a href="#/transaksi" data-route="transaksi">Transaksi</a>
-    <a href="#/anggaran" data-route="anggaran">Anggaran</a>
-    <a href="#/tabungan" data-route="tabungan">Tabungan</a>
-    <a href="#/tagihan" data-route="tagihan">Tagihan</a>
-    <a href="#/laporan" data-route="laporan">Laporan</a>
-  </nav>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true">Rp</span><span><strong>Dompet Keluarga</strong><small>Anggaran rumah tangga · Jakarta</small></span></a>
+    <nav aria-label="Halaman utama">
+      <a href="#/">Ringkasan</a>
+      <a href="#/transaksi">Transaksi</a>
+      <a href="#/anggaran">Anggaran</a>
+      <a href="#/tabungan">Tabungan</a>
+      <a href="#/tagihan">Tagihan</a>
+      <a href="#/laporan">Laporan</a>
+    </nav>
+  </div>
 </header>
-<main id="app" class="page"></main>
-<footer class="foot">
-  <p><strong>Dompet Keluarga</strong> — dibuat untuk keluarga Budi &amp; Sari, Jakarta. Semua angka tersimpan di peramban Anda sendiri, tidak dikirim ke mana pun.</p>
-  <p><a href="#/">Ringkasan</a> · <a href="#/transaksi">Transaksi</a> · <a href="#/anggaran">Anggaran</a> · <a href="#/tabungan">Tabungan</a> · <a href="#/tagihan">Tagihan</a> · <a href="#/laporan">Laporan</a></p>
+<main class="wrap" id="view" aria-live="polite"></main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Dompet Keluarga — catatan keuangan keluarga Budi &amp; Sari, Jakarta. Semua angka dihitung dari transaksi yang tercatat; perubahan tersimpan di peramban ini dan bisa dikembalikan lewat tombol reset di halaman Laporan.</p>
+  </div>
 </footer>
+<script type="module" src="main.js"></script>
 </body>
 </html>
