@@ -1,59 +1,50 @@
-// Server statis kecil untuk pengembangan lokal (Node 22, pustaka standar
-// saja): `node serve.ts` menyajikan app/ di http://localhost:8080
-// (`--port <n>` untuk port lain). Bukan server untuk internet, hanya alat
-// untuk membuka dan menguji situs dari mesin sendiri.
-import { createReadStream, statSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { extname, join, normalize, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Server statis kecil untuk pengembangan lokal Dompet Keluarga.
+// Menjalankan: node serve.ts  (atau: node serve.ts --port 8090)
+// Menyajikan app/ di http://localhost:8080. Pustaka standar saja.
 
-const root = resolve(fileURLToPath(new URL('./app', import.meta.url)));
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(fileURLToPath(new URL("./app", import.meta.url)));
 const args = process.argv.slice(2);
-const portIndex = args.indexOf('--port');
-const requested = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
-const port = Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : 8080;
+let port = 8080;
+const portFlag = args.indexOf("--port");
+if (portFlag !== -1 && args[portFlag + 1]) port = Number(args[portFlag + 1]) || 8080;
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
+const TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
 };
 
-createServer((request, response) => {
-  const url = new URL(request.url ?? '/', 'http://localhost');
-  let pathname;
+const server = createServer(async (req, res) => {
   try {
-    pathname = decodeURIComponent(url.pathname);
+    const url = new URL(req.url || "/", "http://localhost");
+    let rel = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+    if (rel === "" || rel.endsWith("/")) rel += "index.html";
+    const file = resolve(join(root, normalize(rel)));
+    if (!file.startsWith(root)) {
+      res.writeHead(403);
+      res.end("Forbidden");
+      return;
+    }
+    const body = await readFile(file);
+    res.writeHead(200, { "content-type": TYPES[extname(file)] || "application/octet-stream" });
+    res.end(body);
   } catch {
-    response.writeHead(400).end('bad request');
-    return;
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Not found");
   }
-  if (pathname.endsWith('/')) pathname += 'index.html';
-  const file = resolve(join(root, normalize(pathname)));
-  if (file !== root && !file.startsWith(root + sep)) {
-    response.writeHead(403).end('forbidden');
-    return;
-  }
-  let size;
-  try {
-    const stats = statSync(file);
-    if (!stats.isFile()) throw new Error('not a file');
-    size = stats.size;
-  } catch {
-    response.writeHead(404).end('not found');
-    return;
-  }
-  response.writeHead(200, {
-    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
-    'content-length': size,
-    'cache-control': 'no-store',
-  });
-  createReadStream(file).pipe(response);
-}).listen(port, '127.0.0.1', () => {
-  console.log('app/ is on http://localhost:' + port);
+});
+
+server.listen(port, () => {
+  console.log(`Dompet Keluarga di http://localhost:${port}/`);
 });
